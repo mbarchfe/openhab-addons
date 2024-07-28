@@ -12,6 +12,9 @@
  */
 package org.openhab.binding.modbus.flexbatch.internal;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
@@ -22,10 +25,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 @NonNullByDefault
 public class ModbusFlexbatchConfiguration {
 
-    /**
-     * Sample configuration parameters. Replace with your own.
-     */
-    public String hostname = "";
-    public String password = "";
-    public int refreshInterval = 600;
+    public String deviceIds = "1";
+    public List<String> registers = new ArrayList<String>();
+
 }

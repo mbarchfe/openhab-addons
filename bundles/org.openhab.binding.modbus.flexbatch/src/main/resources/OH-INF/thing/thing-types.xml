@@ -1,41 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<thing:thing-descriptions bindingId="modbus.flexbatch"
+<thing:thing-descriptions bindingId="modbus"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
 	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
 
 	<!-- Sample Thing Type -->
-	<thing-type id="sample">
-		<!-- Comment this in for Things which need a Bridge to function.
-			<supported-bridge-type-refs>
-			<bridge-type-ref id="modbus.flexbatchBridge" />
-			</supported-bridge-type-refs>
-		-->
+	<thing-type id="flexbatch">
+		<supported-bridge-type-refs>
+			<bridge-type-ref id="tcp"/>
+		</supported-bridge-type-refs>
 
-		<label>modbus.flexbatch Binding Thing</label>
-		<description>Sample thing for modbus.flexbatch Binding</description>
+		<label>Generic Modbus Device</label>
+		<description>Configure one or many devices using the thing configuration. Creates channels dynamically from the given configuration.</description>
 
-		<channels>
-			<channel id="channel1" typeId="sample-channel"/>
-		</channels>
+
 
 		<config-description>
-			<parameter name="hostname" type="text" required="true">
-				<context>network-address</context>
-				<label>Hostname</label>
-				<description>Hostname or IP address of the device</description>
+			<parameter name="deviceIds" type="text" required="true">				
+				<label>List of device ids</label>
+				<description>Comma separated list of device ids. Overwrites the id set in the bridge.</description>
+				<default>1</default>
 			</parameter>
-			<parameter name="password" type="text" required="true">
-				<context>password</context>
-				<label>Password</label>
-				<description>Password to access the device</description>
+			<parameter name="registers" type="text" multiple="true">				
+				<label>Register definitions</label>
+				<description>Creates groups and channels from register definition. Every line defines ...</description>
 			</parameter>
-			<parameter name="refreshInterval" type="integer" unit="s" min="1">
-				<label>Refresh Interval</label>
-				<description>Interval the device is polled in sec.</description>
-				<default>600</default>
-				<advanced>true</advanced>
-			</parameter>
+			
 		</config-description>
 	</thing-type>
 

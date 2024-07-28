@@ -14,4 +14,11 @@
 
   <name>openHAB Add-ons :: Bundles :: modbus.flexbatch Binding</name>
 
+  <dependencies>
+    <dependency>
+      <groupId>org.openhab.addons.bundles</groupId>
+      <artifactId>org.openhab.binding.modbus</artifactId>
+      <version>4.2.0-SNAPSHOT</version>
+    </dependency>
+  </dependencies>
 </project>

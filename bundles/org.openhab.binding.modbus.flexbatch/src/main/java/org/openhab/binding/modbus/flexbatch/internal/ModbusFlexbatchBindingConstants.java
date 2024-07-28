@@ -13,6 +13,7 @@
 package org.openhab.binding.modbus.flexbatch.internal;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.openhab.binding.modbus.ModbusBindingConstants;
 import org.openhab.core.thing.ThingTypeUID;
 
 /**
@@ -23,12 +24,11 @@ import org.openhab.core.thing.ThingTypeUID;
  */
 @NonNullByDefault
 public class ModbusFlexbatchBindingConstants {
-
-    private static final String BINDING_ID = "modbus.flexbatch";
+    private static final String BINDING_ID = ModbusBindingConstants.BINDING_ID;
 
     // List of all Thing Type UIDs
-    public static final ThingTypeUID THING_TYPE_SAMPLE = new ThingTypeUID(BINDING_ID, "sample");
+    public static final ThingTypeUID THING_TYPE_GENERIC_DEVICE = new ThingTypeUID(BINDING_ID, "flexbatch");
 
     // List of all Channel ids
-    public static final String CHANNEL_1 = "channel1";
+    // channel ids will be generated: depending on your configuration ("flex") and for many devices ("batch")
 }

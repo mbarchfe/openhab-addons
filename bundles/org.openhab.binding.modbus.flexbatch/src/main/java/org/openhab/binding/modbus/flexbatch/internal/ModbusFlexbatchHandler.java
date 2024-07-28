@@ -12,14 +12,34 @@
  */
 package org.openhab.binding.modbus.flexbatch.internal;
 
-import static org.openhab.binding.modbus.flexbatch.internal.ModbusFlexbatchBindingConstants.CHANNEL_1;
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.binding.modbus.handler.ModbusEndpointThingHandler;
+import org.openhab.core.io.transport.modbus.AsyncModbusFailure;
+import org.openhab.core.io.transport.modbus.AsyncModbusReadResult;
+import org.openhab.core.io.transport.modbus.ModbusCommunicationInterface;
+import org.openhab.core.io.transport.modbus.ModbusReadFunctionCode;
+import org.openhab.core.io.transport.modbus.ModbusReadRequestBlueprint;
+import org.openhab.core.io.transport.modbus.ModbusRegisterArray;
+import org.openhab.core.io.transport.modbus.ValueBuffer;
+import org.openhab.core.library.types.QuantityType;
+import org.openhab.core.library.unit.Units;
+import org.openhab.core.thing.Bridge;
+import org.openhab.core.thing.Channel;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingStatus;
+import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.binding.BaseThingHandler;
+import org.openhab.core.thing.binding.ThingHandler;
+import org.openhab.core.thing.binding.builder.ChannelBuilder;
+import org.openhab.core.thing.binding.builder.ThingBuilder;
+import org.openhab.core.thing.type.ChannelTypeUID;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.slf4j.Logger;
@@ -33,10 +53,16 @@ import org.slf4j.LoggerFactory;
  */
 @NonNullByDefault
 public class ModbusFlexbatchHandler extends BaseThingHandler {
+    public enum ReadStatus {
+        NOT_RECEIVED,
+        READ_SUCCESS,
+        READ_FAILED
+    }
 
     private final Logger logger = LoggerFactory.getLogger(ModbusFlexbatchHandler.class);
 
-    private @Nullable ModbusFlexbatchConfiguration config;
+    private ReadStatus dataRead = ReadStatus.NOT_RECEIVED;
+    protected volatile @Nullable ModbusCommunicationInterface comms = null;
 
     public ModbusFlexbatchHandler(Thing thing) {
         super(thing);
@@ -44,23 +70,23 @@ public class ModbusFlexbatchHandler extends BaseThingHandler {
 
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
-        if (CHANNEL_1.equals(channelUID.getId())) {
-            if (command instanceof RefreshType) {
-                // TODO: handle data refresh
-            }
-
-            // TODO: handle command
-
-            // Note: if communication with thing fails for some reason,
-            // indicate that by setting the status with detail information:
-            // updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-            // "Could not control device at IP address x.x.x.x");
+        // if (CHANNEL_1.equals(channelUID.getId())) {
+        if (command instanceof RefreshType) {
+            // TODO: handle data refresh
         }
+
+        // TODO: handle command
+
+        // Note: if communication with thing fails for some reason,
+        // indicate that by setting the status with detail information:
+        // updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
+        // "Could not control device at IP address x.x.x.x");
+        // }
     }
 
     @Override
     public void initialize() {
-        config = getConfigAs(ModbusFlexbatchConfiguration.class);
+        ModbusFlexbatchConfiguration config = getConfigAs(ModbusFlexbatchConfiguration.class);
 
         // TODO: Initialize the handler.
         // The framework requires you to return from this method quickly, i.e. any network access must be done in
@@ -76,16 +102,50 @@ public class ModbusFlexbatchHandler extends BaseThingHandler {
         // we set this upfront to reliably check status updates in unit tests.
         updateStatus(ThingStatus.UNKNOWN);
 
-        // Example for background initialization:
-        scheduler.execute(() -> {
-            boolean thingReachable = true; // <background task with long running initialization here>
-            // when done do:
-            if (thingReachable) {
-                updateStatus(ThingStatus.ONLINE);
-            } else {
-                updateStatus(ThingStatus.OFFLINE);
-            }
+        if (thing.getChannels().size() > 0) {
+            final ThingBuilder thingChannelRemovalBuilder = editThing();
+            thing.getChannels().stream().forEach(channel -> {
+                thingChannelRemovalBuilder.withoutChannel(channel.getUID());
+            });
+            updateThing(thingChannelRemovalBuilder.build());
+
+        }
+
+        scheduler.shutdown();
+        try {
+            scheduler.awaitTermination(10, TimeUnit.SECONDS);
+        } catch (InterruptedException ie) {
+            // TODO handle
+        }
+
+        final ThingBuilder thingBuilder = editThing();
+        Stream<Integer> deviceIds = Arrays.asList(config.deviceIds.split(",")).stream()
+                .map(s -> Integer.valueOf(s).intValue());
+
+        deviceIds.forEach(deviceId -> {
+
+            ChannelUID activePower = new ChannelUID(thing.getUID(), "Messwerte", "ActivePower-" + deviceId);
+
+            Channel channel = ChannelBuilder.create(activePower).withDescription("The active Channel")
+                    .withLabel("ActivePower " + deviceId).withType(new ChannelTypeUID("modbus", "active-power"))
+                    .withAcceptedItemType("Number").build();
+
+            thingBuilder.withChannel(channel);
+            scheduler.execute(() -> {
+                // E3DCConfiguration localConfig = getConfigAs(E3DCConfiguration.class);
+                // config = localConfig;
+                ModbusCommunicationInterface localComms = connectEndpoint();
+                if (localComms != null) {
+                    ModbusReadRequestBlueprint dataRequest = new ModbusReadRequestBlueprint(deviceId,
+                            ModbusReadFunctionCode.READ_MULTIPLE_REGISTERS, 23316, 8, 3);
+
+                    localComms.registerRegularPoll(dataRequest, 1000, 1000, this::handleDataResult,
+                            this::handleDataFailure);
+                } // else state handling performed in connectEndPoint function
+            });
         });
+
+        updateThing(thingBuilder.build());
 
         // These logging types should be primarily used by bindings
         // logger.trace("Example trace message");
@@ -100,5 +160,99 @@ public class ModbusFlexbatchHandler extends BaseThingHandler {
         // Add a description to give user information to understand why thing does not work as expected. E.g.
         // updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
         // "Can not access device as username and/or password are invalid");
+    }
+
+    void handleDataResult(AsyncModbusReadResult result) {
+        if (dataRead != ReadStatus.READ_SUCCESS) {
+            // update status only if bit switches
+            dataRead = ReadStatus.READ_SUCCESS;
+            updateStatus(ThingStatus.ONLINE);
+        }
+        // logger.debug("Got response for request: " + result.getRequest().toString());
+        ModbusReadRequestBlueprint request = result.getRequest();
+
+        int deviceId = request.getUnitID();
+        Optional<ModbusRegisterArray> opt = result.getRegisters();
+
+        byte[] bArray = opt.get().getBytes();
+
+        ValueBuffer wrapper = ValueBuffer.wrap(bArray);
+        long result1 = wrapper.getUInt32();
+
+        QuantityType newCurrentPower = QuantityType.valueOf(result1 / 100, Units.WATT);
+        ChannelUID channelUID = new ChannelUID(thing.getUID(), "Messwerte", "ActivePower-" + deviceId);
+        updateState(channelUID, newCurrentPower);
+
+        long result2 = wrapper.getUInt32();
+        long result3 = wrapper.getUInt32();
+    }
+
+    void handleDataFailure(AsyncModbusFailure<ModbusReadRequestBlueprint> result) {
+        if (dataRead != ReadStatus.READ_FAILED) {
+            // update status only if bit switches
+            dataRead = ReadStatus.READ_FAILED;
+            updateStatus(ThingStatus.OFFLINE);
+        }
+    }
+
+    /**
+     * Get the endpoint handler from the bridge this handler is connected to
+     * Checks that we're connected to the right type of bridge
+     *
+     * @return the endpoint handler or null if the bridge does not exist
+     */
+    private @Nullable ModbusEndpointThingHandler getEndpointThingHandler() {
+        Bridge bridge = getBridge();
+        if (bridge == null) {
+            logger.debug("Bridge is null");
+            return null;
+        }
+        if (bridge.getStatus() != ThingStatus.ONLINE) {
+            logger.debug("Bridge is not online");
+            return null;
+        }
+
+        ThingHandler handler = bridge.getHandler();
+        if (handler == null) {
+            logger.debug("Bridge handler is null");
+            return null;
+        }
+
+        if (handler instanceof ModbusEndpointThingHandler thingHandler) {
+            return thingHandler;
+        } else {
+            logger.debug("Unexpected bridge handler: {}", handler);
+            return null;
+        }
+    }
+
+    /**
+     * Get a reference to the modbus endpoint
+     */
+    private @Nullable ModbusCommunicationInterface connectEndpoint() {
+        if (comms != null) {
+            return comms;
+        }
+
+        ModbusEndpointThingHandler slaveEndpointThingHandler = getEndpointThingHandler();
+        if (slaveEndpointThingHandler == null) {
+            @SuppressWarnings("null")
+            String label = Optional.ofNullable(getBridge()).map(b -> b.getLabel()).orElse("<null>");
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE,
+                    String.format("Bridge '%s' is offline", label));
+            return null;
+        }
+
+        comms = slaveEndpointThingHandler.getCommunicationInterface();
+
+        if (comms == null) {
+            @SuppressWarnings("null")
+            String label = Optional.ofNullable(getBridge()).map(b -> b.getLabel()).orElse("<null>");
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE,
+                    String.format("Bridge '%s' not completely initialized", label));
+            return null;
+        } else {
+            return comms;
+        }
     }
 }

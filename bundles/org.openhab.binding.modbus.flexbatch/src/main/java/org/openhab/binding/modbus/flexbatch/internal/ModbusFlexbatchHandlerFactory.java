@@ -12,7 +12,7 @@
  */
 package org.openhab.binding.modbus.flexbatch.internal;
 
-import static org.openhab.binding.modbus.flexbatch.internal.ModbusFlexbatchBindingConstants.THING_TYPE_SAMPLE;
+import static org.openhab.binding.modbus.flexbatch.internal.ModbusFlexbatchBindingConstants.THING_TYPE_GENERIC_DEVICE;
 
 import java.util.Set;
 
@@ -35,7 +35,7 @@ import org.osgi.service.component.annotations.Component;
 @Component(configurationPid = "binding.modbus.flexbatch", service = ThingHandlerFactory.class)
 public class ModbusFlexbatchHandlerFactory extends BaseThingHandlerFactory {
 
-    private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(THING_TYPE_SAMPLE);
+    private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Set.of(THING_TYPE_GENERIC_DEVICE);
 
     @Override
     public boolean supportsThingType(ThingTypeUID thingTypeUID) {
@@ -46,7 +46,7 @@ public class ModbusFlexbatchHandlerFactory extends BaseThingHandlerFactory {
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
-        if (THING_TYPE_SAMPLE.equals(thingTypeUID)) {
+        if (THING_TYPE_GENERIC_DEVICE.equals(thingTypeUID)) {
             return new ModbusFlexbatchHandler(thing);
         }
 
